@@ -1,10 +1,11 @@
+#include <Arduino.h>
+#include <WiFi.h>
+#include "FS.h"
 #include <SPI.h>
 // ADS1232 24bit ADC works
 // Pin Definitions
 const int DRDY_PIN = 19;      // Data Ready / Data Out pin
-const int PWR_DOWN_PIN = 22;  // Power-Down pin
-
-String serial_read;
+const int PWR_DOWN_PIN = 13;  // Power-Down pin
 
 
 // Global variables
@@ -14,59 +15,56 @@ int adcValue=0;
 int Wtare=0;
 float Windex=76;
 float Weight=0;
-
-void setup() {
-  Serial.begin(115200);
-
-  pinMode(DRDY_PIN, INPUT_PULLUP);
-  pinMode(PWR_DOWN_PIN, OUTPUT);
+String serial_read;
 
 
- 
-  SPI.begin();
 
-  // Set SPI settings for ADS1232
-
-  SPI.beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE1));
-
-  // Ensure the ADS1232 is not in power-down mode initially
-  digitalWrite(PWR_DOWN_PIN, LOW);  // Set power-down pin high to activate
-
-  // No need to attach an interrupt to DRDY, as it's also the DOUT pin
-
-}
-
-void loop() {
+void ReadReg(byte RegIndex)
+{
+byte RegReadqty=0;
+byte Regread[2]; 
+byte ReadCom=0x10;
+byte Command=ReadCom | RegIndex;
+digitalWrite(PWR_DOWN_PIN, LOW);
+SPI.transfer(Command);
+SPI.transfer(RegReadqty);
+delay(0.5);
+  for (int i = 0; i < 1; i++) {
+    adcData[i] = SPI.transfer(0x00);
+  }
   digitalWrite(PWR_DOWN_PIN, HIGH);
-  delay(100);
-  if (digitalRead(DRDY_PIN) == LOW) {
-    // Data is ready, read ADC data
-    readADCData();
-    digitalWrite(PWR_DOWN_PIN, LOW);
-    // Process and print the received data
+   adcValue = (adcData[0] << 8) | adcData[1] ;
+    // adcValue = (adcData[0] << 8) | adcData[1] ;
 
-  }
 
-  if (Serial.available() > 0) {
-    delay (100);  // wait to message arrive
+    Serial.print("Data in HEX: ");
+    Serial.println(adcValue, HEX);
+    Serial.println(String("Data in DEC: ") +  adcValue);
+    // return adcValue;
 
-    // read all the available characters
-    while (Serial.available() > 0) {
-      serial_read = Serial.readStringUntil('\n');
-
-    }
-    serial_read.toLowerCase();
-    if (serial_read == "cal") {
-
-      Calibration();
-
-    } else if (serial_read == "tare") {
-      TareInit();
-    }
-
-  }
 }
 
+void readADCData() {
+  // Read 24 bits of data
+  
+  digitalWrite(PWR_DOWN_PIN, LOW);
+  SPI.transfer(0x01);
+  delay(0.5);
+  for (int i = 0; i < 3; i++) {
+    adcData[i] = SPI.transfer(0x00);
+  }
+   digitalWrite(PWR_DOWN_PIN, HIGH);
+    adcValue = (adcData[0] << 16) | (adcData[1] << 8) | adcData[2];
+    adcValue = adcValue-Wtare;
+    Weight=adcValue/Windex;
+    // Serial.print("ADC Value: ");
+    Serial.print("Data in HEX: ");
+    Serial.println(adcValue, HEX);
+    Serial.println(String("Data in DEC: ") +  adcValue);
+    Serial.println(String("Weight: ") +  Weight + String(" gr"));
+    
+  
+}
 void TareInit(){
 //int TareCells[5];
 Wtare=0;
@@ -98,19 +96,53 @@ void Calibration() {
   SPI.begin();
   Serial.println("Calibration finished");
 }
-void readADCData() {
-  // Read 24 bits of data
-  for (int i = 0; i < 3; i++) {
-    adcData[i] = SPI.transfer(0x00);
-  }
-    adcValue = (adcData[0] << 16) | (adcData[1] << 8) | adcData[2];
-    adcValue = adcValue-Wtare;
-    Weight=adcValue/Windex;
-    Serial.print("ADC Value: ");
-    Serial.print("Data in HEX: ");
-    Serial.println(adcValue, HEX);
-    Serial.println(String("Data in DEC: ") +  adcValue);
-    Serial.println(String("Weight: ") +  Weight + String(" gr"));
-    
-  
+
+
+
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(DRDY_PIN, INPUT_PULLUP);
+  pinMode(PWR_DOWN_PIN, OUTPUT);
+
+
+ 
+  SPI.begin();
+
+  // Set SPI settings for ADS1232
+
+  SPI.beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE1));
+
+  // Ensure the ADS1232 is not in power-down mode initially
+  digitalWrite(PWR_DOWN_PIN, LOW);  // Set power-down pin high to activate
+
+  // No need to attach an interrupt to DRDY, as it's also the DOUT pin
+
 }
+
+void loop() {
+
+
+  ReadReg(0x01);
+//  readADCData();
+//////////////////////////////////////////////////////////////////////
+  if (Serial.available() > 0) {
+    delay (100);  // wait to message arrive
+
+    // read all the available characters
+    while (Serial.available() > 0) {
+      serial_read = Serial.readStringUntil('\n');
+
+    }
+    serial_read.toLowerCase();
+    if (serial_read == "cal") {
+
+      Calibration();
+
+    } else if (serial_read == "tare") {
+      TareInit();
+    }
+
+  }
+}
+
