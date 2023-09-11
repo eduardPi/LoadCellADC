@@ -13,7 +13,7 @@ volatile bool dataReady = false;  // Data Ready flag
 byte adcData[3];
 int adcValue=0;
 int Wtare=0;
-float Windex=76;
+float Windex=1;
 float Weight=0;
 String serial_read;
 
@@ -23,7 +23,7 @@ String serial_read;
   {
       int DataResult=0;
 digitalWrite(PWR_DOWN_PIN, LOW);
-SPI.transfer(0x1);
+SPI.transfer(0x01);
   for (byte i=0; i<3; i++)
   {
     adcData[i]=SPI.transfer(0x00);
@@ -38,6 +38,28 @@ SPI.transfer(0x1);
   Serial.println(DataResult,HEX);
   return DataResult;
   }
+
+void readADCData() {
+  // Read 24 bits of data
+  
+  digitalWrite(PWR_DOWN_PIN, LOW);
+  SPI.transfer(0x01);
+   delay(0.5);
+  for (int i = 0; i < 3; i++) {
+    adcData[i] = SPI.transfer(0x00);
+  }
+   digitalWrite(PWR_DOWN_PIN, HIGH);
+    adcValue = (adcData[0] << 16) | (adcData[1] << 8) | adcData[2];
+    adcValue = adcValue-Wtare;
+    Weight=adcValue/Windex;
+    // Serial.print("ADC Value: ");
+    // Serial.print("Data in HEX: ");
+    // Serial.println(adcValue, HEX);
+    // Serial.println(String("Data in DEC: ") +  adcValue);
+    Serial.println(String("Weight: ") +  Weight + String(" gr"));
+    
+  
+}
 
 
 void WriteReg(byte RegIndex, byte command)
@@ -80,27 +102,7 @@ SPI.transfer(RegReadqty);
 
 }
 
-void readADCData() {
-  // Read 24 bits of data
-  
-  digitalWrite(PWR_DOWN_PIN, LOW);
-  SPI.transfer(0x01);
-   delay(0.5);
-  for (int i = 0; i < 3; i++) {
-    adcData[i] = SPI.transfer(0x00);
-  }
-   digitalWrite(PWR_DOWN_PIN, HIGH);
-    adcValue = (adcData[0] << 16) | (adcData[1] << 8) | adcData[2];
-    adcValue = adcValue-Wtare;
-    Weight=adcValue/Windex;
-    // Serial.print("ADC Value: ");
-    Serial.print("Data in HEX: ");
-    Serial.println(adcValue, HEX);
-    Serial.println(String("Data in DEC: ") +  adcValue);
-    Serial.println(String("Weight: ") +  Weight + String(" gr"));
-    
-  
-}
+
 void TareInit(){
 //int TareCells[5];
 Wtare=0;
@@ -159,8 +161,10 @@ void setup() {
 void loop() {
 
 // WriteReg(0x00,0x06);
-  ReadReg(0x00);
+  // ReadReg(0x00);
 //  readADCData();
+readADCData();
+delay(500);
 //////////////////////////////////////////////////////////////////////
   if (Serial.available() > 0) {
     delay (100);  // wait to message arrive
