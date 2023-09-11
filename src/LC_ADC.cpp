@@ -19,6 +19,42 @@ String serial_read;
 
 
 
+  int LC_DataRead()
+  {
+      int DataResult=0;
+digitalWrite(PWR_DOWN_PIN, LOW);
+SPI.transfer(0x1);
+  for (byte i=0; i<3; i++)
+  {
+    adcData[i]=SPI.transfer(0x00);
+  }
+  digitalWrite(PWR_DOWN_PIN, HIGH);
+  DataResult=adcData[0]<<16;
+  DataResult=adcData[1]<<8;
+  DataResult=adcData[2];
+  Serial.print("Read data DEC: ");
+  Serial.println(DataResult);
+  Serial.print("Read data HEX: ");
+  Serial.println(DataResult,HEX);
+  return DataResult;
+  }
+
+
+void WriteReg(byte RegIndex, byte command)
+{
+byte WriteCommand=0b01010000;
+WriteCommand= WriteCommand | RegIndex;
+byte Regcount=0x0;
+Serial.println(WriteCommand,BIN);
+digitalWrite(PWR_DOWN_PIN, LOW);
+SPI.transfer(WriteCommand);
+SPI.transfer(Regcount);
+SPI.transfer(command);
+digitalWrite(PWR_DOWN_PIN, HIGH);
+
+
+}
+
 void ReadReg(byte RegIndex)
 {
 byte RegReadqty=0;
@@ -28,7 +64,7 @@ byte Command=ReadCom | RegIndex;
 digitalWrite(PWR_DOWN_PIN, LOW);
 SPI.transfer(Command);
 SPI.transfer(RegReadqty);
-delay(0.5);
+ delay(0.1);
   for (int i = 0; i < 1; i++) {
     adcData[i] = SPI.transfer(0x00);
   }
@@ -49,7 +85,7 @@ void readADCData() {
   
   digitalWrite(PWR_DOWN_PIN, LOW);
   SPI.transfer(0x01);
-  delay(0.5);
+   delay(0.5);
   for (int i = 0; i < 3; i++) {
     adcData[i] = SPI.transfer(0x00);
   }
@@ -117,13 +153,13 @@ void setup() {
   digitalWrite(PWR_DOWN_PIN, LOW);  // Set power-down pin high to activate
 
   // No need to attach an interrupt to DRDY, as it's also the DOUT pin
-
+  WriteReg(0x00,0x06);
 }
 
 void loop() {
 
-
-  ReadReg(0x01);
+// WriteReg(0x00,0x06);
+  ReadReg(0x00);
 //  readADCData();
 //////////////////////////////////////////////////////////////////////
   if (Serial.available() > 0) {
