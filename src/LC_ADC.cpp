@@ -2,7 +2,8 @@
 #include <WiFi.h>
 #include "FS.h"
 #include <SPI.h>
-// ADS1232 24bit ADC works
+// ADS1242 24bit ADC works
+
 // Pin Definitions
 const int DRDY_PIN = 19;      // Data Ready / Data Out pin
 const int PWR_DOWN_PIN = 13;  // Power-Down pin
@@ -13,6 +14,7 @@ volatile bool dataReady = false;  // Data Ready flag
 byte adcData[3];
 int adcValue=0;
 int Wtare=0;
+// 69, 
 float Windex=1;
 float Weight=0;
 String serial_read;
@@ -38,20 +40,28 @@ SPI.transfer(0x01);
   Serial.println(DataResult,HEX);
   return DataResult;
   }
+  void Selfcal()
+  {
+    digitalWrite(PWR_DOWN_PIN, LOW);
+    SPI.transfer(0xF0);
+    digitalWrite(PWR_DOWN_PIN, HIGH);
+  }
 
 void readADCData() {
   // Read 24 bits of data
   
   digitalWrite(PWR_DOWN_PIN, LOW);
   SPI.transfer(0x01);
-   delay(0.5);
+   delay(0.1);
   for (int i = 0; i < 3; i++) {
     adcData[i] = SPI.transfer(0x00);
   }
    digitalWrite(PWR_DOWN_PIN, HIGH);
     adcValue = (adcData[0] << 16) | (adcData[1] << 8) | adcData[2];
     adcValue = adcValue-Wtare;
+    // Serial.println(adcValue);
     Weight=adcValue/Windex;
+    //  Serial.println(Weight);
     // Serial.print("ADC Value: ");
     // Serial.print("Data in HEX: ");
     // Serial.println(adcValue, HEX);
@@ -137,6 +147,7 @@ void Calibration() {
 
 
 
+
 void setup() {
   Serial.begin(115200);
 
@@ -155,7 +166,9 @@ void setup() {
   digitalWrite(PWR_DOWN_PIN, LOW);  // Set power-down pin high to activate
 
   // No need to attach an interrupt to DRDY, as it's also the DOUT pin
-  WriteReg(0x00,0x06);
+  WriteReg(0x00,0x06); // Gain
+  // WriteReg(0x02,0x40); 
+  WriteReg(0x02,0x44); 
 }
 
 void loop() {
@@ -181,8 +194,14 @@ delay(500);
 
     } else if (serial_read == "tare") {
       TareInit();
+    } else if (serial_read == "selfcal") {
+    Selfcal();
+    Serial.println("Self calibration complete");
+    } else if (serial_read.substring(0, 5) == "wndx$") {
+      String Wndx=serial_read.substring(5);
+      Windex=Wndx.toInt();
+      Serial.println(String ("Windex set to: ") + Wndx );
     }
 
   }
 }
-
