@@ -1,4 +1,7 @@
+#include <Arduino.h>
 #include <SPI.h>
+#include <FS.h>
+#include <WiFi.h>
 // ADS1232 24bit ADC works
 // Pin Definitions
 const int DRDY_PIN = 19;      // Data Ready / Data Out pin
@@ -14,6 +17,56 @@ int adcValue=0;
 int Wtare=0;
 float Windex=76;
 float Weight=0;
+
+void readADCData() {
+  // Read 24 bits of data
+  for (int i = 0; i < 3; i++) {
+    adcData[i] = SPI.transfer(0x00);
+  }
+    adcValue = (adcData[0] << 16) | (adcData[1] << 8) | adcData[2];
+    adcValue = adcValue-Wtare;
+    Weight=adcValue/Windex;
+    // Serial.print("ADC Value: ");
+    // Serial.print("Data in HEX: ");
+    // Serial.println(adcValue, HEX);
+    Serial.println(String("Data in DEC: ") +  adcValue);
+    Serial.println(String("Weight: ") +  Weight + String(" gr"));
+     
+}
+
+
+
+void TareInit(){
+//int TareCells[5];
+Wtare=0;
+for (byte i; i<5; i++){
+ readADCData();
+ Wtare=adcValue;
+// Wtare+=adcValue;
+//  TareCells[i]=adcValue;
+}
+//Wtare=Wtare/5;
+Serial.println(String("Wtare: ") + Wtare);
+
+//Wtare=(adcValue[0]+adcValue[1]+adcValue[2]+adcValue[3]+adcValue[4])/5);
+}
+void Calibration() {
+  Serial.println("Calibration started");
+  digitalWrite(PWR_DOWN_PIN, HIGH);
+  for (int i = 0; i < 3; i++) {
+    SPI.transfer(0x00);
+  }
+  pinMode(18, OUTPUT);
+  for (byte i; i < 2; i++)
+  {
+    digitalWrite(18, HIGH);
+    digitalWrite(18, LOW);
+  }
+  delay(1000);
+  digitalWrite(PWR_DOWN_PIN, LOW);
+  SPI.begin();
+  Serial.println("Calibration finished");
+}
 
 void setup() {
   Serial.begin(115200);
@@ -62,55 +115,11 @@ void loop() {
 
     } else if (serial_read == "tare") {
       TareInit();
+    } else if (serial_read.substring(0, 5) == "wndx$") {
+      String Wndx=serial_read.substring(5);
+      Windex=Wndx.toInt();
+      Serial.println(String ("Windex set to: ") + Wndx );
     }
 
   }
-}
-
-void TareInit(){
-//int TareCells[5];
-Wtare=0;
-for (byte i; i<5; i++){
- readADCData();
- Wtare=adcValue;
-// Wtare+=adcValue;
-//  TareCells[i]=adcValue;
-}
-//Wtare=Wtare/5;
-Serial.println(String("Wtare: ") + Wtare);
-
-//Wtare=(adcValue[0]+adcValue[1]+adcValue[2]+adcValue[3]+adcValue[4])/5);
-}
-void Calibration() {
-  Serial.println("Calibration started");
-  digitalWrite(PWR_DOWN_PIN, HIGH);
-  for (int i = 0; i < 3; i++) {
-    SPI.transfer(0x00);
-  }
-  pinMode(18, OUTPUT);
-  for (byte i; i < 2; i++)
-  {
-    digitalWrite(18, HIGH);
-    digitalWrite(18, LOW);
-  }
-  delay(1000);
-  digitalWrite(PWR_DOWN_PIN, LOW);
-  SPI.begin();
-  Serial.println("Calibration finished");
-}
-void readADCData() {
-  // Read 24 bits of data
-  for (int i = 0; i < 3; i++) {
-    adcData[i] = SPI.transfer(0x00);
-  }
-    adcValue = (adcData[0] << 16) | (adcData[1] << 8) | adcData[2];
-    adcValue = adcValue-Wtare;
-    Weight=adcValue/Windex;
-    Serial.print("ADC Value: ");
-    Serial.print("Data in HEX: ");
-    Serial.println(adcValue, HEX);
-    Serial.println(String("Data in DEC: ") +  adcValue);
-    Serial.println(String("Weight: ") +  Weight + String(" gr"));
-    
-  
 }
