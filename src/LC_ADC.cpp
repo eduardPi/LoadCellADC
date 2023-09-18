@@ -14,10 +14,13 @@ volatile bool dataReady = false;  // Data Ready flag
 byte adcData[3];
 int adcValue=0;
 int Wtare=0;
+int counter=0;
+long meanSum=0;
 // 69, 
 float Windex=1;
 float Weight=0;
 String serial_read;
+
 
 
 
@@ -40,26 +43,54 @@ SPI.transfer(0x01);
   Serial.println(DataResult,HEX);
   return DataResult;
   }
-  void Selfcal()
+
+    void Selfcal()
   {
     digitalWrite(PWR_DOWN_PIN, LOW);
     SPI.transfer(0xF0);
     digitalWrite(PWR_DOWN_PIN, HIGH);
   }
 
+    void SelfOffsetCal()
+  {
+    digitalWrite(PWR_DOWN_PIN, LOW);
+    SPI.transfer(0xF1);
+    digitalWrite(PWR_DOWN_PIN, HIGH);
+  }
+  void SelfGainCal()
+  {
+    digitalWrite(PWR_DOWN_PIN, LOW);
+    SPI.transfer(0xF2);
+    digitalWrite(PWR_DOWN_PIN, HIGH);
+  }
+  
+    void OffsetCal()
+  {
+    digitalWrite(PWR_DOWN_PIN, LOW);
+    SPI.transfer(0xF3);
+    digitalWrite(PWR_DOWN_PIN, HIGH);
+  }
+  void GainCal()
+  {
+    digitalWrite(PWR_DOWN_PIN, LOW);
+    SPI.transfer(0xF4);
+    digitalWrite(PWR_DOWN_PIN, HIGH);
+  }
+
+
 void readADCData() {
   // Read 24 bits of data
   
   digitalWrite(PWR_DOWN_PIN, LOW);
   SPI.transfer(0x01);
-   delay(0.1);
+   delay(1);
   for (int i = 0; i < 3; i++) {
     adcData[i] = SPI.transfer(0x00);
   }
    digitalWrite(PWR_DOWN_PIN, HIGH);
     adcValue = (adcData[0] << 16) | (adcData[1] << 8) | adcData[2];
     adcValue = adcValue-Wtare;
-    // Serial.println(adcValue);
+    Serial.println(adcValue);
     Weight=adcValue/Windex;
     //  Serial.println(Weight);
     // Serial.print("ADC Value: ");
@@ -67,7 +98,16 @@ void readADCData() {
     // Serial.println(adcValue, HEX);
     // Serial.println(String("Data in DEC: ") +  adcValue);
     Serial.println(String("Weight: ") +  Weight + String(" gr"));
-    
+    counter++;
+    meanSum=(Weight+meanSum);
+    if (counter==30){
+      meanSum=meanSum/counter;
+      counter=0;
+      // Serial.println("*****************");
+      // Serial.println(meanSum);
+      // Serial.println("*****************");
+
+    }
   
 }
 
@@ -197,6 +237,18 @@ delay(500);
     } else if (serial_read == "selfcal") {
     Selfcal();
     Serial.println("Self calibration complete");
+    } else if (serial_read == "selfoffcal") {
+    SelfOffsetCal();
+    Serial.println("Self offset calibration complete");
+    } else if (serial_read == "selfgcal") {
+    SelfGainCal();
+    Serial.println("Self gain calibration complete");
+    } else if (serial_read == "offsetcal") {
+    OffsetCal();
+    Serial.println("Offset calibration complete");
+    } else if (serial_read == "gcal") {
+    GainCal();
+    Serial.println("Gain calibration complete");
     } else if (serial_read.substring(0, 5) == "wndx$") {
       String Wndx=serial_read.substring(5);
       Windex=Wndx.toInt();
