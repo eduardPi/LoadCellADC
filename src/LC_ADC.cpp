@@ -6,7 +6,7 @@
 
 // Pin Definitions
 const int DRDY_PIN = 19;      // Data Ready / Data Out pin
-const int PWR_DOWN_PIN = 13;  // Power-Down pin
+const int PWR_DOWN_PIN = 22;  // Power-Down pin
 
 
 // Global variables
@@ -82,8 +82,8 @@ void readADCData() {
   // Read 24 bits of data
   
   digitalWrite(PWR_DOWN_PIN, LOW);
-  SPI.transfer(0x00);
-   delay(1);
+  SPI.transfer(0x68);
+   delay(0.1);
   for (int i = 0; i < 3; i++) {
     adcData[i] = SPI.transfer(0x00);
   }
