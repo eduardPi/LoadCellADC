@@ -131,13 +131,14 @@ void ReadReg(byte RegIndex)
 {
 byte RegReadqty=0;
 byte Regread[2]; 
-byte ReadCom=0x10;
-byte Command=ReadCom | RegIndex;
+byte ReadCom=0x41;
+byte Command=ReadCom | (RegIndex<<2);
 digitalWrite(PWR_DOWN_PIN, LOW);
+// delay(0.1);
 SPI.transfer(Command);
-SPI.transfer(RegReadqty);
- delay(0.1);
-  for (int i = 0; i < 1; i++) {
+// SPI.transfer(RegReadqty);
+delay(0.1);
+  for (int i = 0; i < 2; i++) {
     adcData[i] = SPI.transfer(0x00);
   }
   digitalWrite(PWR_DOWN_PIN, HIGH);
@@ -215,7 +216,7 @@ void setup() {
 void loop() {
 
 // WriteReg(0x00,0x06);
-  // ReadReg(0x00);
+  ReadReg(0x00);
 //  readADCData();
 readADCData();
 // delay(500);
