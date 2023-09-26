@@ -18,7 +18,9 @@ int adcValue=0;
 int Wtare=0;
 float Windex=-17.8;
 float PrevValue=0;
+float MeasureWeight=0;
 float Weight=0;
+float CurrWeight=0;
 float PrevWeight=0;
 float PrevDelta=0;
 
@@ -31,18 +33,19 @@ void readADCData() {
     adcValue = (adcData[0] << 16) | (adcData[1] << 8) | adcData[2];
     
     // adcValue = adcValue-Wtare;
-    Weight=adcValue/Windex;
-    Weight=Weight-Wtare;
-    PrevDelta=Weight-PrevValue;
+    MeasureWeight=adcValue/Windex;
+    CurrWeight=MeasureWeight-Wtare;
+    PrevDelta=CurrWeight-PrevValue;
 
     if (PrevDelta>0 && abs(PrevDelta)<5)
     {
       Wtare+=PrevDelta;
+      
     } else if (PrevDelta<0 && abs(PrevDelta)<5)
     {
       Wtare-=PrevDelta; 
     }
-    
+    Weight=MeasureWeight-Wtare;
     PrevValue=adcValue;
     PrevWeight=Weight;
 
