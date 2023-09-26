@@ -14,22 +14,42 @@ String serial_read;
 volatile bool dataReady = false;  // Data Ready flag
 byte adcData[3];
 int adcValue=0;
+
 int Wtare=0;
-float Windex=76;
+float Windex=-17.8;
+float PrevValue=0;
 float Weight=0;
+float PrevWeight=0;
+float PrevDelta=0;
 
 void readADCData() {
+  
   // Read 24 bits of data
   for (int i = 0; i < 3; i++) {
     adcData[i] = SPI.transfer(0x00);
   }
     adcValue = (adcData[0] << 16) | (adcData[1] << 8) | adcData[2];
-    adcValue = adcValue-Wtare;
+    
+    // adcValue = adcValue-Wtare;
     Weight=adcValue/Windex;
+    Weight=Weight-Wtare;
+    PrevDelta=Weight-PrevValue;
+
+    if (PrevDelta>0 && abs(PrevDelta)<5)
+    {
+      Wtare+=PrevDelta;
+    } else if (PrevDelta<0 && abs(PrevDelta)<5)
+    {
+      Wtare-=PrevDelta; 
+    }
+    
+    PrevValue=adcValue;
+    PrevWeight=Weight;
+
     // Serial.print("ADC Value: ");
     // Serial.print("Data in HEX: ");
     // Serial.println(adcValue, HEX);
-    Serial.println(String("Data in DEC: ") +  adcValue);
+    // Serial.println(String("Data in DEC: ") +  adcValue);
     Serial.println(String("Weight: ") +  Weight + String(" gr"));
      
 }
@@ -39,12 +59,13 @@ void readADCData() {
 void TareInit(){
 //int TareCells[5];
 Wtare=0;
-for (byte i; i<5; i++){
+// for (byte i; i<5; i++){
  readADCData();
- Wtare=adcValue;
+//  Wtare=adcValue;
+Wtare=Weight;
 // Wtare+=adcValue;
 //  TareCells[i]=adcValue;
-}
+// }
 //Wtare=Wtare/5;
 Serial.println(String("Wtare: ") + Wtare);
 
@@ -86,16 +107,19 @@ void setup() {
   digitalWrite(PWR_DOWN_PIN, LOW);  // Set power-down pin high to activate
 
   // No need to attach an interrupt to DRDY, as it's also the DOUT pin
+delay(1000);
+TareInit();
 
 }
 
 void loop() {
+  delay(1000);
   digitalWrite(PWR_DOWN_PIN, HIGH);
   delay(100);
   if (digitalRead(DRDY_PIN) == LOW) {
     // Data is ready, read ADC data
     readADCData();
-    digitalWrite(PWR_DOWN_PIN, LOW);
+    // digitalWrite(PWR_DOWN_PIN, LOW);
     // Process and print the received data
 
   }
@@ -117,7 +141,7 @@ void loop() {
       TareInit();
     } else if (serial_read.substring(0, 5) == "wndx$") {
       String Wndx=serial_read.substring(5);
-      Windex=Wndx.toInt();
+      Windex=Wndx.toFloat();
       Serial.println(String ("Windex set to: ") + Wndx );
     }
 
