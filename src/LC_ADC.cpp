@@ -77,13 +77,18 @@ SPI.transfer(0x01);
     digitalWrite(PWR_DOWN_PIN, HIGH);
   }
 
-
+void ADCReset()
+{
+    digitalWrite(PWR_DOWN_PIN, LOW);
+    SPI.transfer(0xFD);
+    digitalWrite(PWR_DOWN_PIN, HIGH);
+}
 void readADCData() {
   // Read 24 bits of data
   
   digitalWrite(PWR_DOWN_PIN, LOW);
   SPI.transfer(0x01);
-   delay(1);
+   delay(0.2);
   for (int i = 0; i < 3; i++) {
     adcData[i] = SPI.transfer(0x00);
   }
@@ -136,7 +141,7 @@ byte Command=ReadCom | RegIndex;
 digitalWrite(PWR_DOWN_PIN, LOW);
 SPI.transfer(Command);
 SPI.transfer(RegReadqty);
- delay(0.1);
+  delay(0.1);
   for (int i = 0; i < 1; i++) {
     adcData[i] = SPI.transfer(0x00);
   }
@@ -213,9 +218,10 @@ void setup() {
 
 void loop() {
 
-// WriteReg(0x00,0x06);
-  // ReadReg(0x00);
-//  readADCData();
+// WriteReg(0x00,0x07);
+// ReadReg(0x00);
+// ReadReg(0x0A);
+
 readADCData();
 delay(500);
 //////////////////////////////////////////////////////////////////////
@@ -249,6 +255,9 @@ delay(500);
     } else if (serial_read == "gcal") {
     GainCal();
     Serial.println("Gain calibration complete");
+    } else if (serial_read == "reset") {
+      ADCReset();
+      Serial.println("ADC reset complete");
     } else if (serial_read.substring(0, 5) == "wndx$") {
       String Wndx=serial_read.substring(5);
       Windex=Wndx.toInt();
