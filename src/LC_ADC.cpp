@@ -1,74 +1,175 @@
 #include <Arduino.h>
-#include <SPI.h>
-#include <FS.h>
 #include <WiFi.h>
+#include "FS.h"
+#include <SPI.h>
 // ADS1232 24bit ADC works
+
 // Pin Definitions
 const int DRDY_PIN = 19;      // Data Ready / Data Out pin
-const int PWR_DOWN_PIN = 22;  // Power-Down pin
-
-String serial_read;
+const int PWR_DOWN_PIN = 13;  // Power-Down pin (Matrix board- 22) (MSR2- 13)
 
 
 // Global variables
 volatile bool dataReady = false;  // Data Ready flag
 byte adcData[3];
 int adcValue=0;
-
 int Wtare=0;
-float Windex=-17.8;
-float PrevValue=0;
-float MeasureWeight=0;
+int counter=0;
+long meanSum=0;
+// 69, 
+float Windex=17.8;
 float Weight=0;
-float CurrWeight=0;
-float PrevWeight=0;
-float PrevDelta=0;
+String serial_read;
 
-void readADCData() {
+
+
+
+  int LC_DataRead()
+  {
+      int DataResult=0;
+digitalWrite(PWR_DOWN_PIN, LOW);
+SPI.transfer(0x01);
+  for (byte i=0; i<3; i++)
+  {
+    adcData[i]=SPI.transfer(0x00);
+  }
+  digitalWrite(PWR_DOWN_PIN, HIGH);
+  DataResult=adcData[0]<<16;
+  DataResult=adcData[1]<<8;
+  DataResult=adcData[2];
+  Serial.print("Read data DEC: ");
+  Serial.println(DataResult);
+  Serial.print("Read data HEX: ");
+  Serial.println(DataResult,HEX);
+  return DataResult;
+  }
+
+    void Selfcal()
+  {
+    digitalWrite(PWR_DOWN_PIN, LOW);
+    SPI.transfer(0xF0);
+    digitalWrite(PWR_DOWN_PIN, HIGH);
+  }
+
+    void SelfOffsetCal()
+  {
+    digitalWrite(PWR_DOWN_PIN, LOW);
+    SPI.transfer(0xF1);
+    digitalWrite(PWR_DOWN_PIN, HIGH);
+  }
+  void SelfGainCal()
+  {
+    digitalWrite(PWR_DOWN_PIN, LOW);
+    SPI.transfer(0xF2);
+    digitalWrite(PWR_DOWN_PIN, HIGH);
+  }
   
+    void OffsetCal()
+  {
+    digitalWrite(PWR_DOWN_PIN, LOW);
+    SPI.transfer(0xF3);
+    digitalWrite(PWR_DOWN_PIN, HIGH);
+  }
+  void GainCal()
+  {
+    digitalWrite(PWR_DOWN_PIN, LOW);
+    SPI.transfer(0xF4);
+    digitalWrite(PWR_DOWN_PIN, HIGH);
+  }
+
+void ADCReset()
+{
+    digitalWrite(PWR_DOWN_PIN, LOW);
+    SPI.transfer(0xFD);
+    digitalWrite(PWR_DOWN_PIN, HIGH);
+}
+void readADCData() {
   // Read 24 bits of data
+  
+  digitalWrite(PWR_DOWN_PIN, HIGH);
+  // SPI.transfer(0x01);
+//   delay(500);
+if (digitalRead(DRDY_PIN)==LOW)
+{
   for (int i = 0; i < 3; i++) {
     adcData[i] = SPI.transfer(0x00);
   }
+
+   digitalWrite(PWR_DOWN_PIN, LOW);
     adcValue = (adcData[0] << 16) | (adcData[1] << 8) | adcData[2];
-    
-    // adcValue = adcValue-Wtare;
-    MeasureWeight=adcValue/Windex;
-    CurrWeight=MeasureWeight-Wtare;
-    PrevDelta=CurrWeight-PrevValue;
-
-    if (PrevDelta>0 && abs(PrevDelta)<5)
-    {
-      Wtare+=PrevDelta;
-      
-    } else if (PrevDelta<0 && abs(PrevDelta)<5)
-    {
-      Wtare-=PrevDelta; 
-    }
-    Weight=MeasureWeight-Wtare;
-    PrevValue=adcValue;
-    PrevWeight=Weight;
-
+    adcValue = adcValue-Wtare;
+//    Serial.println(adcValue);
+    Weight=adcValue/Windex;
+    //  Serial.println(Weight);
     // Serial.print("ADC Value: ");
     // Serial.print("Data in HEX: ");
     // Serial.println(adcValue, HEX);
     // Serial.println(String("Data in DEC: ") +  adcValue);
     Serial.println(String("Weight: ") +  Weight + String(" gr"));
-     
+    counter++;
+    meanSum=(Weight+meanSum);
+    if (counter==30){
+      meanSum=meanSum/counter;
+      counter=0;
+      // Serial.println("*****************");
+      // Serial.println(meanSum);
+      // Serial.println("*****************");
+
+    }
+  }
 }
 
+
+void WriteReg(byte RegIndex, byte command)
+{
+byte WriteCommand=0b01010000;
+WriteCommand= WriteCommand | RegIndex;
+byte Regcount=0x0;
+Serial.println(WriteCommand,BIN);
+digitalWrite(PWR_DOWN_PIN, LOW);
+SPI.transfer(WriteCommand);
+SPI.transfer(Regcount);
+SPI.transfer(command);
+digitalWrite(PWR_DOWN_PIN, HIGH);
+
+
+}
+
+void ReadReg(byte RegIndex)
+{
+byte RegReadqty=0;
+byte Regread[2]; 
+byte ReadCom=0x10;
+byte Command=ReadCom | RegIndex;
+digitalWrite(PWR_DOWN_PIN, LOW);
+SPI.transfer(Command);
+SPI.transfer(RegReadqty);
+  delay(0.1);
+  for (int i = 0; i < 1; i++) {
+    adcData[i] = SPI.transfer(0x00);
+  }
+  digitalWrite(PWR_DOWN_PIN, HIGH);
+   adcValue = (adcData[0] << 8) | adcData[1] ;
+    // adcValue = (adcData[0] << 8) | adcData[1] ;
+
+
+    Serial.print("Data in HEX: ");
+    Serial.println(adcValue, HEX);
+    Serial.println(String("Data in DEC: ") +  adcValue);
+    // return adcValue;
+
+}
 
 
 void TareInit(){
 //int TareCells[5];
 Wtare=0;
-// for (byte i; i<5; i++){
+for (byte i; i<5; i++){
  readADCData();
-//  Wtare=adcValue;
-Wtare=Weight;
+ Wtare=adcValue;
 // Wtare+=adcValue;
 //  TareCells[i]=adcValue;
-// }
+}
 //Wtare=Wtare/5;
 Serial.println(String("Wtare: ") + Wtare);
 
@@ -92,13 +193,20 @@ void Calibration() {
   Serial.println("Calibration finished");
 }
 
+
+
+
 void setup() {
   Serial.begin(115200);
 
-  pinMode(DRDY_PIN, INPUT_PULLUP);
+//  pinMode(DRDY_PIN, INPUT_PULLUP);
   pinMode(PWR_DOWN_PIN, OUTPUT);
 
-
+digitalWrite(PWR_DOWN_PIN, HIGH);
+delay(0.2);
+digitalWrite(PWR_DOWN_PIN, LOW);
+delay(0.2);
+digitalWrite(PWR_DOWN_PIN, HIGH);
  
   SPI.begin();
 
@@ -110,23 +218,21 @@ void setup() {
   digitalWrite(PWR_DOWN_PIN, LOW);  // Set power-down pin high to activate
 
   // No need to attach an interrupt to DRDY, as it's also the DOUT pin
-delay(1000);
-TareInit();
+  // WriteReg(0x00,0x06); // Gain
+  // WriteReg(0x02,0x40); 
+  // WriteReg(0x02,0x44); 
 
 }
 
 void loop() {
-  delay(1000);
-  digitalWrite(PWR_DOWN_PIN, HIGH);
-  delay(100);
-  if (digitalRead(DRDY_PIN) == LOW) {
-    // Data is ready, read ADC data
-    readADCData();
-    // digitalWrite(PWR_DOWN_PIN, LOW);
-    // Process and print the received data
 
-  }
+// WriteReg(0x00,0x07);
+// ReadReg(0x00);
+// ReadReg(0x0A);
 
+readADCData();
+//delay(300);
+//////////////////////////////////////////////////////////////////////
   if (Serial.available() > 0) {
     delay (100);  // wait to message arrive
 
@@ -142,9 +248,27 @@ void loop() {
 
     } else if (serial_read == "tare") {
       TareInit();
+    } else if (serial_read == "selfcal") {
+    Selfcal();
+    Serial.println("Self calibration complete");
+    } else if (serial_read == "selfoffcal") {
+    SelfOffsetCal();
+    Serial.println("Self offset calibration complete");
+    } else if (serial_read == "selfgcal") {
+    SelfGainCal();
+    Serial.println("Self gain calibration complete");
+    } else if (serial_read == "offsetcal") {
+    OffsetCal();
+    Serial.println("Offset calibration complete");
+    } else if (serial_read == "gcal") {
+    GainCal();
+    Serial.println("Gain calibration complete");
+    } else if (serial_read == "reset") {
+      ADCReset();
+      Serial.println("ADC reset complete");
     } else if (serial_read.substring(0, 5) == "wndx$") {
       String Wndx=serial_read.substring(5);
-      Windex=Wndx.toFloat();
+      Windex=Wndx.toInt();
       Serial.println(String ("Windex set to: ") + Wndx );
     }
 
