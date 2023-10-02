@@ -5,6 +5,7 @@
 // ADS1232 24bit ADC works
 
 // Pin Definitions
+#define IO_exp_nCS 5
 const int DRDY_PIN = 19;      // Data Ready / Data Out pin
 const int PWR_DOWN_PIN = 13;  // Power-Down pin (Matrix board- 22) (MSR2- 13)
 
@@ -16,9 +17,11 @@ int adcValue=0;
 int Wtare=0;
 int counter=0;
 long meanSum=0;
-// 69, 
-float Windex=17.8;
+float Windex=-17.8;
 float Weight=0;
+float PrevWeight=0;
+byte EX_PORT0 = B00110001;
+byte EX_PORT1 = B11100000;
 String serial_read;
 
 
@@ -100,22 +103,23 @@ if (digitalRead(DRDY_PIN)==LOW)
     adcValue = adcValue-Wtare;
 //    Serial.println(adcValue);
     Weight=adcValue/Windex;
+    PrevWeight=Weight;
     //  Serial.println(Weight);
     // Serial.print("ADC Value: ");
     // Serial.print("Data in HEX: ");
     // Serial.println(adcValue, HEX);
     // Serial.println(String("Data in DEC: ") +  adcValue);
     Serial.println(String("Weight: ") +  Weight + String(" gr"));
-    counter++;
-    meanSum=(Weight+meanSum);
-    if (counter==30){
-      meanSum=meanSum/counter;
-      counter=0;
-      // Serial.println("*****************");
-      // Serial.println(meanSum);
-      // Serial.println("*****************");
+    // counter++;
+    // meanSum=(Weight+meanSum);
+    // if (counter==30){
+    //   meanSum=meanSum/counter;
+    //   counter=0;
+    //   // Serial.println("*****************");
+    //   // Serial.println(meanSum);
+    //   // Serial.println("*****************");
 
-    }
+    // }
   }
 }
 
@@ -193,7 +197,62 @@ void Calibration() {
   Serial.println("Calibration finished");
 }
 
+int SPI_IO_expander_send(byte address, byte command)
+{
+  unsigned int bit_command = 0;
+  bit_command = (bit_command | address) << 9;
+  //Serial.print("not shifted: ");
+  //Serial.println(bit_command,BIN);
+  //bit_command=bit_command<<9;
+  bit_command = bit_command | command;
 
+  digitalWrite(IO_exp_nCS, LOW);
+  SPI.transfer16(bit_command);
+  digitalWrite(IO_exp_nCS, HIGH);
+  /*
+    Serial.print("Bit command: ");
+    Serial.print(bit_command, HEX);
+    Serial.print("  ");
+    Serial.println(bit_command, BIN);
+    return  bit_command;
+  */
+  return  bit_command;
+}
+
+int IO_exp_read(byte reg)
+{
+  byte reg_rcv = 0;
+  unsigned int read_reg = 0b1000000000000000;
+  unsigned int command = reg << 9;
+  command = read_reg | command;
+  Serial.print("Register read :");
+  Serial.print(command, HEX);
+  Serial.print(" ");
+  Serial.println(command, BIN);
+
+  digitalWrite(IO_exp_nCS, LOW);            // set the SS pin to LOW
+  reg_rcv = SPI.transfer16(command);
+  digitalWrite(IO_exp_nCS, HIGH);
+  if (reg == 0)
+  {
+    Serial.print("I/O reg0: ");
+  } else if (reg == 1)
+  {
+    Serial.print("I/O reg1: ");
+  }
+
+  Serial.println(reg_rcv, BIN);
+  return reg_rcv;
+}
+
+void IO_reg_init()
+{
+
+  SPI_IO_expander_send(0x06, 0x00);
+  SPI_IO_expander_send(0x02, EX_PORT0);
+  SPI_IO_expander_send(0x07, 0x00);
+  SPI_IO_expander_send(0x03, EX_PORT1);
+}
 
 
 void setup() {
@@ -212,7 +271,7 @@ digitalWrite(PWR_DOWN_PIN, HIGH);
 
   // Set SPI settings for ADS1232
 
-  SPI.beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE1));
+  SPI.beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE0));
 
   // Ensure the ADS1232 is not in power-down mode initially
   digitalWrite(PWR_DOWN_PIN, LOW);  // Set power-down pin high to activate
@@ -221,8 +280,9 @@ digitalWrite(PWR_DOWN_PIN, HIGH);
   // WriteReg(0x00,0x06); // Gain
   // WriteReg(0x02,0x40); 
   // WriteReg(0x02,0x44); 
-
+  IO_reg_init();
 }
+
 
 void loop() {
 
@@ -231,6 +291,10 @@ void loop() {
 // ReadReg(0x0A);
 
 readADCData();
+  // IO_exp_read(0x00);
+  // delay(100);
+  // IO_exp_read(0x01);
+  // delay(100);
 //delay(300);
 //////////////////////////////////////////////////////////////////////
   if (Serial.available() > 0) {
@@ -268,7 +332,7 @@ readADCData();
       Serial.println("ADC reset complete");
     } else if (serial_read.substring(0, 5) == "wndx$") {
       String Wndx=serial_read.substring(5);
-      Windex=Wndx.toInt();
+      Windex=Wndx.toFloat();
       Serial.println(String ("Windex set to: ") + Wndx );
     }
 
