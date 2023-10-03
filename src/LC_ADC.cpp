@@ -6,6 +6,11 @@
 
 // Pin Definitions
 #define IO_exp_nCS 5
+#define S2_0 16    //GPIO 16  on board
+#define S2_1 4    //GPIO 4    on board
+#define S2_2 0    //GPIO 0    on board
+#define S2_3 2    //GPIO 2    on board
+
 const int DRDY_PIN = 19;      // Data Ready / Data Out pin
 const int PWR_DOWN_PIN = 13;  // Power-Down pin (Matrix board- 22) (MSR2- 13)
 
@@ -47,6 +52,23 @@ SPI.transfer(0x01);
   return DataResult;
   }
 
+byte sensor_state_optimized( byte optimized_state)
+{
+  switch (optimized_state)
+  {
+    case 0:
+      digitalWrite(S2_3, LOW); digitalWrite(S2_2, LOW); digitalWrite(S2_1, LOW); digitalWrite(S2_0, LOW);
+      //      digitalWrite(S1_3, LOW); digitalWrite(S1_2, LOW); digitalWrite(S1_1, LOW); digitalWrite(S1_0, LOW);
+      //      digitalWrite(S2_3, LOW); digitalWrite(S2_2, LOW); digitalWrite(S2_1, LOW); digitalWrite(S2_0, LOW);
+      break;
+
+    case 15:
+      digitalWrite(S2_3, HIGH); digitalWrite(S2_2, HIGH); digitalWrite(S2_1, HIGH); digitalWrite(S2_0, HIGH);
+
+  }
+  return optimized_state;
+}
+
     void Selfcal()
   {
     digitalWrite(PWR_DOWN_PIN, LOW);
@@ -86,18 +108,23 @@ void ADCReset()
     SPI.transfer(0xFD);
     digitalWrite(PWR_DOWN_PIN, HIGH);
 }
+
 void readADCData() {
   // Read 24 bits of data
   
   digitalWrite(PWR_DOWN_PIN, HIGH);
-  // SPI.transfer(0x01);
-//   delay(500);
-if (digitalRead(DRDY_PIN)==LOW)
+  sensor_state_optimized(15);
+  // delay(500);
+while (digitalRead(DRDY_PIN)!=LOW)
 {
+
+}
+// if (digitalRead(DRDY_PIN)==LOW)
+// {
   for (int i = 0; i < 3; i++) {
     adcData[i] = SPI.transfer(0x00);
   }
-
+   sensor_state_optimized(0);
    digitalWrite(PWR_DOWN_PIN, LOW);
     adcValue = (adcData[0] << 16) | (adcData[1] << 8) | adcData[2];
     adcValue = adcValue-Wtare;
@@ -120,7 +147,11 @@ if (digitalRead(DRDY_PIN)==LOW)
     //   // Serial.println("*****************");
 
     // }
-  }
+    // sensor_state_optimized(0);
+    // delay(100);
+    
+// }
+  
 }
 
 
@@ -225,10 +256,10 @@ int IO_exp_read(byte reg)
   unsigned int read_reg = 0b1000000000000000;
   unsigned int command = reg << 9;
   command = read_reg | command;
-  Serial.print("Register read :");
-  Serial.print(command, HEX);
-  Serial.print(" ");
-  Serial.println(command, BIN);
+  // Serial.print("Register read :");
+  // Serial.print(command, HEX);
+  // Serial.print(" ");
+  // Serial.println(command, BIN);
 
   digitalWrite(IO_exp_nCS, LOW);            // set the SS pin to LOW
   reg_rcv = SPI.transfer16(command);
@@ -254,10 +285,37 @@ void IO_reg_init()
   SPI_IO_expander_send(0x03, EX_PORT1);
 }
 
+void A2D2_sampling()
+{
+  byte Regconf = B11011111;
+
+  EX_PORT1 = EX_PORT1 & Regconf;
+  SPI_IO_expander_send(0x03, EX_PORT1);
+
+  int A2D_VAL = SPI.transfer16(0);
+
+  Regconf = B00100000;
+  EX_PORT1 = EX_PORT1 | Regconf;
+  SPI_IO_expander_send(0x03, EX_PORT1);
+ Serial.println(String("ADC board: ") + A2D_VAL);
+
+}
+
 
 void setup() {
   Serial.begin(115200);
 
+  pinMode(S2_0, OUTPUT);
+  digitalWrite(S2_0, LOW);
+  pinMode(S2_1, OUTPUT);
+  digitalWrite(S2_1, LOW);
+  pinMode(S2_2, OUTPUT);
+  digitalWrite(S2_2, LOW);
+  pinMode(S2_3, OUTPUT);
+  digitalWrite(S2_3, LOW);
+
+pinMode(IO_exp_nCS, OUTPUT);
+digitalWrite(IO_exp_nCS, HIGH);
 //  pinMode(DRDY_PIN, INPUT_PULLUP);
   pinMode(PWR_DOWN_PIN, OUTPUT);
 
@@ -281,20 +339,22 @@ digitalWrite(PWR_DOWN_PIN, HIGH);
   // WriteReg(0x02,0x40); 
   // WriteReg(0x02,0x44); 
   IO_reg_init();
+ sensor_state_optimized(0);
 }
 
 
 void loop() {
-
+ 
 // WriteReg(0x00,0x07);
 // ReadReg(0x00);
-// ReadReg(0x0A);
-
+//  ReadReg(0x0A);
+A2D2_sampling();
 readADCData();
-  // IO_exp_read(0x00);
-  // delay(100);
-  // IO_exp_read(0x01);
-  // delay(100);
+// delay(100);
+//   IO_exp_read(0x00);
+//   delay(100);
+//   IO_exp_read(0x01);
+//   delay(100);
 //delay(300);
 //////////////////////////////////////////////////////////////////////
   if (Serial.available() > 0) {
