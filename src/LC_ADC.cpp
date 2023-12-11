@@ -2,7 +2,8 @@
 #include <WiFi.h>
 #include "FS.h"
 #include <SPI.h>
-// ADS1232 24bit ADC works
+#include <NHB_AD7124.h>
+// AD7124 24bit ADC works
 
 // Pin Definitions
 #define IO_exp_nCS 5
@@ -12,7 +13,7 @@
 #define S2_3 2    //GPIO 2    on board
 
 const int DRDY_PIN = 19;      // Data Ready / Data Out pin
-const int PWR_DOWN_PIN = 13;  // Power-Down pin (Matrix board- 22) (MSR2- 13)
+const int PWR_DOWN_PIN = 22;  // Power-Down pin (Matrix board- 22) (MSR2- 13)
 
 
 // Global variables
@@ -22,7 +23,8 @@ int adcValue=0;
 int Wtare=0;
 int counter=0;
 long meanSum=0;
-float Windex=-17.8;
+// float Windex=-17.8;
+float Windex=646;
 float Weight=0;
 float PrevWeight=0;
 byte EX_PORT0 = B00110001;
@@ -112,31 +114,42 @@ void ADCReset()
 void readADCData() {
   // Read 24 bits of data
   
-  digitalWrite(PWR_DOWN_PIN, HIGH);
-  sensor_state_optimized(15);
+  digitalWrite(PWR_DOWN_PIN, LOW);
+  // sensor_state_optimized(15);
   // delay(500);
-while (digitalRead(DRDY_PIN)!=LOW)
-{
-
-}
-// if (digitalRead(DRDY_PIN)==LOW)
+// while (digitalRead(DRDY_PIN)!=LOW)
 // {
+
+// }
+// while(digitalRead(DRDY_PIN)!=LOW){}
+
+
+if (digitalRead(DRDY_PIN)==LOW)
+{
+SPI.transfer(0x01);
+SPI.transfer(0x04);
+SPI.transfer(0x42);
+
   for (int i = 0; i < 3; i++) {
     adcData[i] = SPI.transfer(0x00);
   }
    sensor_state_optimized(0);
-   digitalWrite(PWR_DOWN_PIN, LOW);
+   digitalWrite(PWR_DOWN_PIN, HIGH);
     adcValue = (adcData[0] << 16) | (adcData[1] << 8) | adcData[2];
     adcValue = adcValue-Wtare;
-//    Serial.println(adcValue);
+    // Serial.print("HEX: ");
+    // Serial.print(adcValue,HEX);
+    // Serial.print("DEC: ");
+    // Serial.println(adcValue);
     Weight=adcValue/Windex;
     PrevWeight=Weight;
-    //  Serial.println(Weight);
+    // Serial.println(Weight);
     // Serial.print("ADC Value: ");
     // Serial.print("Data in HEX: ");
     // Serial.println(adcValue, HEX);
-    // Serial.println(String("Data in DEC: ") +  adcValue);
-    Serial.println(String("Weight: ") +  Weight + String(" gr"));
+    // Serial.println(String(" Data in DEC: ") +  adcValue);
+    Serial.print(String("Weight: ") +  Weight + String(" gr"));
+    Serial.println (String(" | RawData: ") + adcValue + String(" | Windex: ") + Windex + String(" | Tare: ") + Wtare);
     // counter++;
     // meanSum=(Weight+meanSum);
     // if (counter==30){
@@ -150,7 +163,7 @@ while (digitalRead(DRDY_PIN)!=LOW)
     // sensor_state_optimized(0);
     // delay(100);
     
-// }
+} else {digitalWrite(PWR_DOWN_PIN, HIGH);}
   
 }
 
@@ -163,8 +176,24 @@ byte Regcount=0x0;
 Serial.println(WriteCommand,BIN);
 digitalWrite(PWR_DOWN_PIN, LOW);
 SPI.transfer(WriteCommand);
-SPI.transfer(Regcount);
+// SPI.transfer(Regcount);
 SPI.transfer(command);
+digitalWrite(PWR_DOWN_PIN, HIGH);
+
+
+}
+
+void WriteReg2bytes(byte RegIndex, byte command1, byte command2)
+{
+byte WriteCommand=0b00000000;
+WriteCommand= WriteCommand | RegIndex;
+byte Regcount=0x0;
+Serial.println(WriteCommand,BIN);
+digitalWrite(PWR_DOWN_PIN, LOW);
+SPI.transfer(WriteCommand);
+SPI.transfer(command1);
+SPI.transfer(command2);
+// SPI.transfer(Regcount);
 digitalWrite(PWR_DOWN_PIN, HIGH);
 
 
@@ -174,16 +203,43 @@ void ReadReg(byte RegIndex)
 {
 byte RegReadqty=0;
 byte Regread[2]; 
-byte ReadCom=0x10;
+byte ReadCom=0x40;
 byte Command=ReadCom | RegIndex;
 digitalWrite(PWR_DOWN_PIN, LOW);
 SPI.transfer(Command);
-SPI.transfer(RegReadqty);
+// SPI.transfer(RegReadqty);
   delay(0.1);
   for (int i = 0; i < 1; i++) {
     adcData[i] = SPI.transfer(0x00);
   }
   digitalWrite(PWR_DOWN_PIN, HIGH);
+  
+   adcValue = (adcData[0] << 8) | adcData[1] ;
+    // adcValue = (adcData[0] << 8) | adcData[1] ;
+
+
+    Serial.print("Data in HEX: ");
+    Serial.println(adcValue, HEX);
+    Serial.println(String("Data in DEC: ") +  adcValue);
+    // return adcValue;
+
+}
+
+void ReadReg2bytes(byte RegIndex)
+{
+byte RegReadqty=0;
+byte Regread[2]; 
+byte ReadCom=0x40;
+byte Command=ReadCom | RegIndex;
+digitalWrite(PWR_DOWN_PIN, LOW);
+SPI.transfer(Command);
+// SPI.transfer(RegReadqty);
+  delay(0.1);
+  for (int i = 0; i < 2; i++) {
+    adcData[i] = SPI.transfer(0x00);
+  }
+  digitalWrite(PWR_DOWN_PIN, HIGH);
+  
    adcValue = (adcData[0] << 8) | adcData[1] ;
     // adcValue = (adcData[0] << 8) | adcData[1] ;
 
@@ -338,24 +394,29 @@ digitalWrite(PWR_DOWN_PIN, HIGH);
   // WriteReg(0x00,0x06); // Gain
   // WriteReg(0x02,0x40); 
   // WriteReg(0x02,0x44); 
+  sensor_state_optimized(0);
   IO_reg_init();
- sensor_state_optimized(0);
+  WriteReg2bytes(0x19,0x00,0xff);   // config Configuration register 0x19
+ 
 }
 
 
 void loop() {
- 
+  // WriteReg2bytes(0x19,0x00,0xff);
+  // digitalWrite(PWR_DOWN_PIN, HIGH);
+// Serial.println("test");
 // WriteReg(0x00,0x07);
 // ReadReg(0x00);
-//  ReadReg(0x0A);
-A2D2_sampling();
-readADCData();
-// delay(100);
-//   IO_exp_read(0x00);
+// ReadReg(0x0A);
+// ReadReg2bytes(0x19) ;
+// A2D2_sampling();
+ readADCData();
+delay(100);
+//  IO_exp_read(0x00);
 //   delay(100);
-//   IO_exp_read(0x01);
+//  IO_exp_read(0x01);
 //   delay(100);
-//delay(300);
+// delay(300);
 //////////////////////////////////////////////////////////////////////
   if (Serial.available() > 0) {
     delay (100);  // wait to message arrive
