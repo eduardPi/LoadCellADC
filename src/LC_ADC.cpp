@@ -104,9 +104,9 @@ long adcValue=0;
 int Wtare=0;
 int counter=0;
 long meanSum=0;
-int LoadTrigger=5;
-int WeightToCalibrate=1395;
-float Windex=14.5;
+float LoadTrigger=30;
+int WeightToCalibrate=517;
+float Windex=1.45;
 float Weight=0;
 float PrevWeight=0;
 float ActualPrevWeight=0;
@@ -6062,7 +6062,7 @@ void readADCData()
   // {
   //   Wtare+=(Weight*Windex);
   // }
-  if (abs(WeightDelta) < 5)
+  if (abs(WeightDelta) < 30)
   {
     if (WeightChange)
     {
